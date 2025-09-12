@@ -341,7 +341,9 @@
             transition: background 0.8s ease-in-out;
         }
 
-        /* Sunny */
+        /* --- DAYTIME ANIMATIONS --- */
+
+        /* Sunny Day */
         .current-weather.sunny .weather-animation-bg {
             background: linear-gradient(to bottom, #47b2ff, #87d2ff);
         }
@@ -360,7 +362,7 @@
             50% { transform: scale(1.1); opacity: 1; }
         }
 
-        /* Cloudy */
+        /* Cloudy Day */
         .current-weather.cloudy .weather-animation-bg,
         .current-weather.mist .weather-animation-bg {
             background: linear-gradient(to bottom, #bdc3c7, #757f9a);
@@ -395,7 +397,7 @@
             to { transform: translateX(20%); }
         }
         
-        /* Rain */
+        /* Rainy Day */
         .current-weather.rain .weather-animation-bg {
             background: linear-gradient(to bottom, #606c88, #3f4c6b);
         }
@@ -411,7 +413,7 @@
             to { transform: translateY(110vh); }
         }
 
-        /* Snow */
+        /* Snowy Day */
         .current-weather.snow .weather-animation-bg {
             background: linear-gradient(to bottom, #485461, #28313b);
         }
@@ -430,7 +432,7 @@
             100% { transform: translateY(110vh) translateX(10vw) rotate(360deg); }
         }
         
-        /* Storm */
+        /* Stormy Day/Night (always dark) */
         .current-weather.storm .weather-animation-bg {
             background: #232526;
         }
@@ -448,6 +450,51 @@
             97% { opacity: 1; }
             98% { opacity: 0.1; }
         }
+
+        /* --- NIGHTTIME ANIMATIONS --- */
+
+        /* Clear Night */
+        .current-weather.sunny.night .weather-animation-bg {
+            background: linear-gradient(to bottom, #000428, #004e92);
+        }
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.5);
+            animation: twinkle 2s infinite alternate;
+        }
+        @keyframes twinkle {
+            from { opacity: 0.5; }
+            to { opacity: 1; }
+        }
+
+        /* Cloudy Night */
+        .current-weather.cloudy.night .weather-animation-bg,
+        .current-weather.mist.night .weather-animation-bg {
+            background: linear-gradient(to bottom, #232526, #414345);
+        }
+        .current-weather.cloudy.night .cloud {
+            opacity: 0.2;
+            background: #444;
+        }
+        .current-weather.cloudy.night .cloud::before, 
+        .current-weather.cloudy.night .cloud::after {
+            background: #444;
+        }
+        
+        /* Rainy Night */
+        .current-weather.rain.night .weather-animation-bg {
+            background: linear-gradient(to bottom, #141E30, #243B55);
+        }
+        
+        /* Snowy Night */
+        .current-weather.snow.night .weather-animation-bg {
+            background: linear-gradient(to bottom, #1c1c1c, #2c3e50);
+        }
+
 
         /* Sidebar */
         .sidebar {
@@ -1522,7 +1569,7 @@
 
             historyGrid.innerHTML = searchHistory.map((item, index) => {
                 const timeAgo = getTimeAgo(new Date(item.timestamp));
-                const icon = getWeatherIcon(item.weather.main, item.weather.id);
+                const icon = getWeatherIcon(item.weather.main, true); // Assume day for history icon
                 
                 return `
                     <div class="history-card" onclick="loadHistoryCity(${index})">
@@ -1618,7 +1665,7 @@
         }
         
         // Animated Weather Background
-        function setAnimatedWeatherBackground(weatherCondition) {
+        function setAnimatedWeatherBackground(weatherCondition, isDay) {
             const cwContainer = document.getElementById('currentWeather');
             const bgContainer = cwContainer.querySelector('.weather-animation-bg');
             if (!bgContainer) return;
@@ -1631,10 +1678,23 @@
             
             switch (weatherCondition) {
                 case 'Clear':
-                    weatherClass = 'sunny';
-                    const sun = document.createElement('div');
-                    sun.className = 'sun';
-                    bgContainer.appendChild(sun);
+                    weatherClass = 'sunny'; // Base class for clear weather
+                    if (isDay) {
+                        const sun = document.createElement('div');
+                        sun.className = 'sun';
+                        bgContainer.appendChild(sun);
+                    } else {
+                        // Create stars for a clear night
+                        for (let i = 0; i < 100; i++) {
+                            const star = document.createElement('div');
+                            star.className = 'star';
+                            star.style.left = `${Math.random() * 100}%`;
+                            star.style.top = `${Math.random() * 100}%`;
+                            star.style.animationDelay = `${Math.random() * 2}s`;
+                            star.style.transform = `scale(${0.1 + Math.random() * 0.2})`;
+                            bgContainer.appendChild(star);
+                        }
+                    }
                     break;
                     
                 case 'Clouds':
@@ -1708,13 +1768,16 @@
 
             if (weatherClass) {
                 cwContainer.classList.add(weatherClass);
+                if (!isDay) {
+                    cwContainer.classList.add('night');
+                }
             }
         }
 
         // Weather Icons
-        function getWeatherIcon(main, id) {
+        function getWeatherIcon(main, isDay) {
             const iconMap = {
-                'Clear': '<i class="fas fa-sun"></i>',
+                'Clear': isDay ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>',
                 'Clouds': '<i class="fas fa-cloud"></i>',
                 'Rain': '<i class="fas fa-cloud-showers-heavy"></i>',
                 'Drizzle': '<i class="fas fa-cloud-rain"></i>',
@@ -1780,7 +1843,10 @@
 
         // Display Functions
         function displayCurrentWeather(data) {
-            const icon = getWeatherIcon(data.weather[0].main, data.weather[0].id);
+            // Determine if it's day or night in the searched city
+            const isDay = data.dt > data.sys.sunrise && data.dt < data.sys.sunset;
+            
+            const icon = getWeatherIcon(data.weather[0].main, isDay);
             const cityName = `${data.name}, ${data.sys.country}`;
             
             currentWeather.innerHTML = `
@@ -1831,8 +1897,8 @@
                 </div>
             `;
             
-            // Set animated background
-            setAnimatedWeatherBackground(data.weather[0].main);
+            // Set animated background based on weather and time of day
+            setAnimatedWeatherBackground(data.weather[0].main, isDay);
 
             // Update map and status bar
             updateMapLocation(data.coord.lat, data.coord.lon, cityName);
@@ -1846,8 +1912,10 @@
             const hourlyData = data.list.slice(0, 8); // Next 24 hours (8 x 3-hour intervals)
             
             hourlyForecast.innerHTML = hourlyData.map(item => {
+                 // Determine if it's day or night for each forecast item
+                const isDay = item.sys.pod === 'd';
                 const time = new Date(item.dt * 1000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'});
-                const icon = getWeatherIcon(item.weather[0].main, item.weather[0].id);
+                const icon = getWeatherIcon(item.weather[0].main, isDay);
                 
                 return `
                     <div class="hourly-item">
@@ -1879,7 +1947,7 @@
                 const maxTemp = Math.max(...temps);
                 const minTemp = Math.min(...temps);
                 const mainWeather = dayData[Math.floor(dayData.length / 2)].weather[0];
-                const icon = getWeatherIcon(mainWeather.main, mainWeather.id);
+                const icon = getWeatherIcon(mainWeather.main, true); // Assume daytime for daily forecast icon
                 
                 const dayName = new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 
